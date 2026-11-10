@@ -1,0 +1,904 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSE Physics 垃圾選項秒殺閃卡庫</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- MathJax 公式支援 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        ignoreHtmlClass: 'tex2jax_ignore',
+        processHtmlClass: 'tex2jax_process'
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- 載入錯誤監聽 -->
+  <script>
+    window.addEventListener('error', function(e) {
+      if (e.target && e.target.tagName === 'SCRIPT' && e.target.src.indexOf('cards.js') !== -1) {
+        window.CARDS_LOAD_ERROR = "檔案存在但內部代碼有語法錯誤，請檢查 cards.js 括號與逗號。";
+      }
+    }, true);
+  </script>
+
+  <!-- 載入外部題目資料 -->
+  <script src="cards.js" onerror="window.CARDS_LOAD_ERROR = '找不到 cards.js 檔案，請確認檔名與路徑是否與 index3.html 置於同一資料夾。';"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center p-4 tex2jax_process">
+
+  <!-- 頂部標題與篩選列 -->
+  <header class="w-full max-w-2xl flex flex-col gap-3 mb-4">
+    <div class="text-center mt-2">
+      <h1 class="text-xl font-extrabold text-slate-800">⚡ DSE Physics 秒殺閃卡庫 ⚡</h1>
+      <p class="text-xs text-slate-500 mt-1">專攻選擇題（MC）中的「垃圾選項」與考官設局剖析</p>
+    </div>
+
+    <div class="flex flex-wrap justify-between items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- 課題篩選 (已對齊 JSON 中的標準繁體中文分類) -->
+        <select id="topicFilter" class="bg-slate-50 border rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="ALL">全部課題 (All Topics)</option>
+          <option value="力和運動">力和運動 Force & Motion</option>
+          <option value="波動學">波動學 Waves</option>
+          <option value="電磁學">電磁學 Electricity & Magnetism</option>
+          <option value="熱和氣壓">熱和氣壓 Thermal Physics</option>
+          <option value="放射現象和核能">放射現象和核能 Nuclear Physics</option>
+        </select>
+
+        <!-- 難度篩選 -->
+        <select id="difficultyFilter" class="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 text-sm font-bold text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="ALL" selected>全部難度 (All)</option>
+          <option value="L">🟢 基礎 L</option>
+          <option value="M">🟡 中等 M</option>
+          <option value="H">🔴 衝五 H</option>
+        </select>
+
+        <!-- 題型篩選 -->
+        <select id="qtypeFilter" class="bg-sky-50 border border-sky-200 rounded-lg px-3 py-1.5 text-sm font-bold text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <option value="ALL">全部題型 (All Types)</option>
+          <option value="C">💡 概念分析 (Concept)</option>
+          <option value="M">📐 數學計算 (Maths)</option>
+          <option value="F">🧬 公式/回憶 (Recall)</option>
+        </select>
+
+        <!-- 篩選模式：全部 / 僅練錯題 -->
+        <select id="modeFilter" class="bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 text-sm font-bold text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="ALL">全部題目池</option>
+          <option value="WRONG_ONLY">⚠️ 只練錯題 (錯題池)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap mt-1">
+        <!-- 精通進度指示器 -->
+        <span id="progressIndicator" class="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1.5 rounded-lg border" title="只有答對的題目會列入精通並移出輪播池">
+          已精通: 0 / 0 題
+        </span>
+        <button id="resetProgressBtn" class="text-xs text-red-600 hover:text-red-800 font-bold border border-red-200 hover:border-red-300 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-all" title="重設所有進度">
+          🔄 重設進度
+        </button>
+        <button id="randomBtn" class="bg-indigo-600 text-white text-sm px-3 py-1.5 rounded-lg shadow hover:bg-indigo-700 transition-colors flex items-center gap-1 font-semibold">
+          🎲 隨機抽卡
+        </button>
+
+        <!-- 一鍵匯出弱點報告按鈕 -->
+        <button id="exportReportBtn" class="bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg shadow hover:from-teal-600 hover:to-emerald-700 transition-colors flex items-center gap-1 font-extrabold" title="匯出個人錯題本與弱點診斷報告">
+          📄 弱點報告
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 晉級炫彩通告欄 (Level Up Alert Box) -->
+  <div id="levelUpBanner" class="hidden w-full max-w-2xl bg-gradient-to-r from-amber-500 via-red-500 to-yellow-500 text-white px-5 py-4 rounded-2xl mb-4 shadow-lg flex items-center justify-between animate-bounce">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🎉</span>
+      <div>
+        <h3 class="font-extrabold text-base tracking-wide">關卡狀態更新</h3>
+        <p id="levelUpMsg" class="text-xs text-amber-50 opacity-90"></p>
+      </div>
+    </div>
+    <button onclick="document.getElementById('levelUpBanner').classList.add('hidden')" class="bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1 rounded-lg text-xs transition-all">
+      知道了 🚀
+    </button>
+  </div>
+
+  <!-- 錯誤提示面板 -->
+  <div id="errorPanel" class="hidden w-full max-w-2xl bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-4 shadow" role="alert">
+    <strong class="font-bold">❌ 偵測到資料載入失敗！</strong>
+    <p id="errorDetail" class="text-sm mt-1"></p>
+  </div>
+
+  <!-- 閃卡主體 -->
+  <div id="card" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-200 p-6 cursor-pointer select-none transition-all duration-300 hover:shadow-2xl min-h-[450px] flex flex-col justify-between relative">
+
+    <!-- 作答反饋標籤 -->
+    <div id="feedbackBadge" class="hidden absolute top-4 right-4 z-10 font-bold text-xs px-2.5 py-1 rounded-full shadow-sm"></div>
+
+    <!-- 正面內容 -->
+    <div id="front" class="space-y-4">
+      <div class="flex justify-between items-center text-xs text-slate-400 pb-2 border-b border-slate-100">
+        <!-- 卡片資訊、難度標記、題型標記 -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span id="cardTag" class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md font-bold tracking-wide">載入中...</span>
+          <span id="diffBadge" class="px-2 py-1 rounded-md font-extrabold tracking-wide text-xs"></span>
+          <span id="qtypeBadge" class="px-2 py-1 rounded-md font-extrabold tracking-wide text-xs"></span>
+        </div>
+        <span class="flex items-center gap-1 text-amber-500 font-medium animate-pulse">
+          💡 請選擇答案或點擊卡片空白處翻面
+        </span>
+      </div>
+
+      <!-- 題目文字 -->
+      <p id="questionText" class="text-slate-800 font-semibold text-base leading-relaxed"></p>
+
+      <!-- 題目附圖容器 -->
+      <div id="imgContainer" class="flex flex-col items-center justify-center my-3 hidden">
+        <!-- 主圖片 -->
+        <img id="questionImg" src="" alt="題目圖示" class="max-h-60 max-w-full object-contain rounded-xl border border-slate-200 shadow-sm bg-white p-1">
+        
+        <!-- 當找不到圖片時的友善路徑提示框（點擊可查看或除錯） -->
+        <div id="imgErrorHint" class="hidden mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs w-full max-w-md text-left">
+          <p class="font-bold flex items-center gap-1">⚠️ 題目附圖未載入成功</p>
+          <p class="mt-1 text-slate-600">系統嘗試過以下路徑，但未能在本地找到檔案：</p>
+          <code id="imgTriedPath" class="block bg-amber-100/70 p-1.5 rounded mt-1 text-slate-800 font-mono text-[11px] break-all"></code>
+          <p class="mt-1.5 text-[11px] text-slate-500">
+            💡 <strong>解決方法：</strong>請確認 <code>index3.html</code> 同層目錄下是否有 <code>images</code> 資料夾，且圖片檔名包含正確的空格與副檔名。
+          </p>
+        </div>
+      </div>
+
+      <!-- 選項列表 -->
+      <div id="optionsList" class="space-y-2 text-sm text-slate-700"></div>
+    </div>
+
+    <!-- 背面內容 -->
+    <div id="back" class="hidden flex-col justify-end border-t border-dashed border-slate-200 pt-4 mt-4 space-y-3">
+      <div class="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-r-xl">
+        <h4 class="text-red-700 font-extrabold text-sm flex items-center gap-1.5">
+          🗑️ 絕對垃圾選項：
+          <span id="trashList" class="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-mono"></span>
+        </h4>
+        <p id="killReason" class="text-red-800 text-sm mt-2 leading-relaxed font-medium"></p>
+      </div>
+
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-3.5 rounded-r-xl">
+        <h4 class="text-blue-700 font-extrabold text-xs flex items-center gap-1">
+          🎯 衝 5 考官設局剖析：
+        </h4>
+        <p id="distractorText" class="text-blue-900 text-xs mt-1.5 leading-relaxed"></p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 底部切換列 -->
+  <footer class="w-full max-w-2xl flex justify-between items-center mt-5 px-1">
+    <button id="prevBtn" class="px-5 py-2 bg-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-colors shadow-sm">
+      ⬅️ 上一題
+    </button>
+    <span id="counter" class="text-sm font-bold text-slate-500 tracking-wider">0 / 0</span>
+    <button id="nextBtn" class="px-5 py-2 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors shadow-sm">
+      下一題 ➡️
+    </button>
+  </footer>
+
+  <!-- 腳本主體 -->
+  <script>
+    let originalCards = []; 
+    let cards = [];         
+    let currentIndex = 0;
+    let isFlipped = false;
+    let answered = false; 
+
+    // 儲存已答對題目的 ID (LocalStorage 永久保存)
+    let masteredCardIds = new Set();
+    // 儲存曾答錯題目的 ID (LocalStorage 永久保存)
+    let wrongCardIds = new Set();
+    // 儲存已嘗試作答過的題目 ID (第一輪不重複做錯題的關鍵)
+    let attemptedCardIds = new Set();
+
+    // 錯題冷卻期記錄 (cardId -> 剩餘冷卻題數)
+    let wrongCooldowns = {}; 
+
+    // 安全非阻塞的 MathJax 渲染函數
+    function triggerMathJaxRender() {
+      if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+        window.MathJax.typesetPromise().catch(function (err) {
+          console.warn('MathJax 渲染暫緩:', err.message);
+        });
+      }
+    }
+
+    function loadProgress() {
+      const storedMastered = localStorage.getItem('dse_phys_mastered_ids');
+      if (storedMastered) {
+        try {
+          masteredCardIds = new Set(JSON.parse(storedMastered));
+        } catch (e) {
+          masteredCardIds = new Set();
+        }
+      }
+
+      const storedWrong = localStorage.getItem('dse_phys_wrong_ids');
+      if (storedWrong) {
+        try {
+          wrongCardIds = new Set(JSON.parse(storedWrong));
+        } catch (e) {
+          wrongCardIds = new Set();
+        }
+      }
+
+      const storedAttempted = localStorage.getItem('dse_phys_attempted_ids');
+      if (storedAttempted) {
+        try {
+          attemptedCardIds = new Set(JSON.parse(storedAttempted));
+        } catch (e) {
+          attemptedCardIds = new Set();
+        }
+      }
+      updateProgressUI();
+    }
+
+    function saveProgress() {
+      localStorage.setItem('dse_phys_mastered_ids', JSON.stringify([...masteredCardIds]));
+      localStorage.setItem('dse_phys_wrong_ids', JSON.stringify([...wrongCardIds]));
+      localStorage.setItem('dse_phys_attempted_ids', JSON.stringify([...attemptedCardIds]));
+      updateProgressUI();
+    }
+
+    function updateProgressUI() {
+      const totalInTopic = cards.length;
+      const masteredInTopic = cards.filter(c => masteredCardIds.has(c.id)).length;
+      document.getElementById('progressIndicator').textContent = `已精通: ${masteredInTopic} / ${totalInTopic} 題`;
+    }
+
+    function initFlashcards(data) {
+      if (!data || !Array.isArray(data)) {
+        showError("載入的資料格式不正確。");
+        return;
+      }
+      originalCards = data.flat(Infinity);
+
+      loadProgress();
+      applyFilters();
+    }
+
+    // 統一處理篩選機制（包括課題、難度、題型、錯題池）
+    function applyFilters() {
+      const selectedTopic = document.getElementById('topicFilter').value;
+      const selectedDiff = document.getElementById('difficultyFilter').value;
+      const selectedQType = document.getElementById('qtypeFilter').value;
+      const selectedMode = document.getElementById('modeFilter').value;
+
+      // 1. 篩選課題 (支援去除前後空格精確匹配)
+      let filtered = [...originalCards];
+      if (selectedTopic !== 'ALL') {
+        filtered = filtered.filter(c => c.topic && c.topic.trim() === selectedTopic.trim());
+      }
+
+      // 2. 篩選難度
+      if (selectedDiff !== 'ALL') {
+        filtered = filtered.filter(c => c.difficulty && c.difficulty.trim() === selectedDiff.trim());
+      }
+
+      // 3. 篩選題型
+      if (selectedQType !== 'ALL') {
+        filtered = filtered.filter(c => c.qtype && c.qtype.trim() === selectedQType.trim());
+      }
+
+      // 4. 篩選是否只練習錯題
+      if (selectedMode === 'WRONG_ONLY') {
+        filtered = filtered.filter(c => wrongCardIds.has(c.id));
+      }
+
+      cards = filtered;
+      wrongCooldowns = {};
+
+      currentIndex = findNextUnansweredIndex(0);
+      renderCard();
+    }
+
+    // 升級/晉級檢測
+    function checkAndLevelUp() {
+      const totalL = originalCards.filter(c => c.difficulty === 'L').length;
+      const masteredL = originalCards.filter(c => c.difficulty === 'L' && masteredCardIds.has(c.id)).length;
+
+      const totalM = originalCards.filter(c => c.difficulty === 'M').length;
+      const masteredM = originalCards.filter(c => c.difficulty === 'M' && masteredCardIds.has(c.id)).length;
+
+      const totalH = originalCards.filter(c => c.difficulty === 'H').length;
+      const masteredH = originalCards.filter(c => c.difficulty === 'H' && masteredCardIds.has(c.id)).length;
+
+      const currentDiffFilter = document.getElementById('difficultyFilter').value;
+
+      // 🟢 基礎 L 通關 -> 升級到 M
+      if (currentDiffFilter === 'L' && totalL > 0 && masteredL === totalL) {
+        setTimeout(() => {
+          showLevelUpBanner("🎉 完美解鎖！您已精通所有【🟢 基礎 (L)】題目！系統已為您自動解鎖並升級至【🟡 中等難度 (M)】！");
+          document.getElementById('difficultyFilter').value = 'M';
+          applyFilters();
+        }, 800);
+      } 
+      // 🟡 中等 M 通關 -> 升級到 H
+      else if (currentDiffFilter === 'M' && totalM > 0 && masteredM === totalM) {
+        setTimeout(() => {
+          showLevelUpBanner("🔥 太強了！您已精通所有【🟡 中等難度 (M)】題目！系統已為您自動晉升至最頂尖的【🔴 衝五必學 (H)】！");
+          document.getElementById('difficultyFilter').value = 'H';
+          applyFilters();
+        }, 800);
+      } 
+      // 🔴 衝五 H 通關 -> 終極大滿貫慶祝
+      else if (currentDiffFilter === 'H' && totalH > 0 && masteredH === totalH) {
+        setTimeout(() => {
+          showLevelUpBanner("🏆 終極大滿貫！您已完美精通所有【🔴 衝五必學 (H)】題目！您已具備 DSE Physics 5** 的王者實力！");
+        }, 800);
+      }
+    }
+
+    function showLevelUpBanner(msg) {
+      const banner = document.getElementById('levelUpBanner');
+      const bannerMsg = document.getElementById('levelUpMsg');
+      bannerMsg.textContent = msg;
+      banner.classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function tickCooldowns(currentCardId) {
+      for (let id in wrongCooldowns) {
+        if (id !== currentCardId && wrongCooldowns[id] > 0) {
+          wrongCooldowns[id]--;
+        }
+      }
+    }
+
+    function findNextUnansweredIndex(startIndex, direction = 1) {
+      if (cards.length === 0) return 0;
+
+      // 第一階段：優先尋找尚未嘗試過的題目
+      const unattempted = cards.filter(card => !attemptedCardIds.has(card.id));
+      if (unattempted.length > 0) {
+        const unattemptedIds = new Set(unattempted.map(c => c.id));
+        let step = 0;
+        let idx = startIndex;
+        while (step < cards.length) {
+          const card = cards[idx];
+          if (unattemptedIds.has(card.id)) {
+            return idx;
+          }
+          idx = (idx + direction + cards.length) % cards.length;
+          step++;
+        }
+        return startIndex;
+      }
+
+      // 第二階段：全部嘗試過後，啟用錯題重溫池
+      const unmastered = cards.filter(card => !masteredCardIds.has(card.id));
+      if (unmastered.length === 0) {
+        return startIndex % cards.length;
+      }
+
+      const available = unmastered.filter(card => (wrongCooldowns[card.id] || 0) <= 0);
+      const poolToUse = available.length > 0 ? available : unmastered;
+      const poolIds = new Set(poolToUse.map(c => c.id));
+
+      let step = 0;
+      let idx = startIndex;
+      while (step < cards.length) {
+        const card = cards[idx];
+        if (poolIds.has(card.id)) {
+          return idx;
+        }
+        idx = (idx + direction + cards.length) % cards.length;
+        step++;
+      }
+      return startIndex;
+    }
+
+    // 🎯 核心強固功能：智慧圖片載入與多重候選路徑探測 (Smart Image Resolver)
+    function loadQuestionImage(imageField, cardId) {
+      const container = document.getElementById('imgContainer');
+      const img = document.getElementById('questionImg');
+      const errBox = document.getElementById('imgErrorHint');
+      const triedCode = document.getElementById('imgTriedPath');
+
+      // 若本題完全無圖，直接隱藏容器
+      if (!imageField || imageField.trim() === '') {
+        container.classList.add('hidden');
+        img.src = '';
+        errBox.classList.add('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+      errBox.classList.add('hidden');
+      img.classList.remove('hidden');
+
+      const rawPath = imageField.trim();
+      
+      // 生成自動容錯候選路徑表：
+      // 1. 原路徑 (例如 "images/HKDSE 2022 MCQ 9.webp")
+      // 2. URL 編碼空格版 (例如 "images/HKDSE%202022%20MCQ%209.webp")
+      // 3. 常見替代副檔名 (.png, .jpg)
+      const candidateUrls = [
+        rawPath,
+        encodeURI(rawPath),
+        rawPath.replace(/\.webp$/i, '.png'),
+        rawPath.replace(/\.webp$/i, '.jpg'),
+        rawPath.replace(/^images\//, '') // 若直接放在同一目錄下的後備
+      ];
+      
+      // 去重
+      const uniqueCandidates = [...new Set(candidateUrls)];
+      let attemptIndex = 0;
+
+      function tryNextImage() {
+        if (attemptIndex < uniqueCandidates.length) {
+          const currentUrl = uniqueCandidates[attemptIndex];
+          attemptIndex++;
+          
+          img.onload = function() {
+            // 成功載入！隱藏錯誤提示
+            errBox.classList.add('hidden');
+            img.classList.remove('hidden');
+          };
+
+          img.onerror = function() {
+            // 失敗則嘗試下一個候選路徑
+            tryNextImage();
+          };
+
+          img.src = currentUrl;
+        } else {
+          // 所有路徑皆無法載入 -> 顯示視覺化提示，方便直接知道是哪個路徑找不到
+          img.classList.add('hidden');
+          triedCode.textContent = uniqueCandidates.join(' | ');
+          errBox.classList.remove('hidden');
+          console.warn(`[Image Load Failed] 題目 ${cardId} 的圖片在以下路徑均找不到:`, uniqueCandidates);
+        }
+      }
+
+      tryNextImage();
+    }
+
+    function renderCard() {
+      if (!cards || cards.length === 0) {
+        const isWrongOnly = document.getElementById('modeFilter').value === 'WRONG_ONLY';
+        document.getElementById('questionText').textContent = isWrongOnly 
+          ? "🎉 恭喜！目前沒有任何未解決的錯題！可以切換回「全部題目池」或更改篩選條件。" 
+          : "⚠️ 沒有符合篩選條件的閃卡。請確認篩選欄位是否與題目相符。";
+        document.getElementById('cardTag').textContent = "Empty";
+        document.getElementById('diffBadge').className = "hidden";
+        document.getElementById('qtypeBadge').className = "hidden";
+        document.getElementById('optionsList').innerHTML = "";
+        document.getElementById('imgContainer').classList.add('hidden');
+        document.getElementById('counter').textContent = "0 / 0";
+        document.getElementById('feedbackBadge').classList.add('hidden');
+        updateProgressUI();
+        return;
+      }
+
+      const c = cards[currentIndex];
+      if (!c) return;
+
+      tickCooldowns(c.id);
+
+      // 強制重設狀態
+      isFlipped = false;
+      answered = false;
+      document.getElementById('back').classList.add('hidden');
+      document.getElementById('feedbackBadge').classList.add('hidden');
+
+      const topicLabel = c.subtopic ? `${c.topic} (${c.subtopic})` : (c.topic || '物理綜合');
+      document.getElementById('cardTag').textContent = `${c.id || 'N/A'} • ${topicLabel}`;
+
+      // 渲染難度標記
+      const diffBadge = document.getElementById('diffBadge');
+      diffBadge.classList.remove('hidden');
+      if (c.difficulty === 'L') {
+        diffBadge.className = "bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        diffBadge.textContent = "🟢 基礎 L";
+      } else if (c.difficulty === 'M') {
+        diffBadge.className = "bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        diffBadge.textContent = "🟡 中等 M";
+      } else if (c.difficulty === 'H') {
+        diffBadge.className = "bg-rose-100 text-rose-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        diffBadge.textContent = "🔴 衝五 H";
+      } else {
+        diffBadge.className = "bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        diffBadge.textContent = c.difficulty || "N/A";
+      }
+
+      // 渲染題型標記
+      const qtypeBadge = document.getElementById('qtypeBadge');
+      qtypeBadge.classList.remove('hidden');
+      if (c.qtype === 'C') {
+        qtypeBadge.className = "bg-sky-100 text-sky-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        qtypeBadge.textContent = "💡 概念 Concept";
+      } else if (c.qtype === 'M') {
+        qtypeBadge.className = "bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        qtypeBadge.textContent = "📐 數學 Maths";
+      } else if (c.qtype === 'F') {
+        qtypeBadge.className = "bg-fuchsia-100 text-fuchsia-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        qtypeBadge.textContent = "🧬 公式/回憶 Recall";
+      } else {
+        qtypeBadge.className = "bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md font-extrabold text-xs";
+        qtypeBadge.textContent = c.qtype || "N/A";
+      }
+
+      document.getElementById('questionText').textContent = c.question || '無題目內容';
+
+      // 呼叫智慧圖片載入解析器
+      loadQuestionImage(c.image, c.id);
+
+      // 渲染選項
+      const optDiv = document.getElementById('optionsList');
+      optDiv.innerHTML = '';
+      if (c.options && typeof c.options === 'object') {
+        Object.entries(c.options).forEach(([key, val]) => {
+          const optItem = document.createElement('div');
+          optItem.className = "option-item p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-start gap-2 hover:bg-slate-100 transition-colors cursor-pointer";
+          optItem.dataset.key = key;
+          optItem.innerHTML = `<span class="font-extrabold text-indigo-600">${key}.</span> <span class="text-slate-700">${val}</span>`;
+
+          optItem.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            if (answered) return; 
+            answered = true;
+
+            const selectedKey = key;
+            const correctKey = c.answer;
+            const isCorrect = (selectedKey === correctKey);
+
+            const isFirstAttemptForThisCard = !attemptedCardIds.has(c.id);
+            attemptedCardIds.add(c.id);
+
+            if (isCorrect) {
+              masteredCardIds.add(c.id);
+              wrongCardIds.delete(c.id);
+              if (wrongCooldowns[c.id]) {
+                delete wrongCooldowns[c.id]; 
+              }
+              saveProgress();
+
+              const badge = document.getElementById('feedbackBadge');
+              badge.className = "absolute top-4 right-4 z-10 bg-green-500 text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm";
+              badge.textContent = "✓ 答對！已納入精通";
+              badge.classList.remove('hidden');
+
+            } else {
+              if (masteredCardIds.has(c.id)) {
+                masteredCardIds.delete(c.id);
+              }
+              wrongCardIds.add(c.id);
+              wrongCooldowns[c.id] = 3; 
+              saveProgress();
+
+              const badge = document.getElementById('feedbackBadge');
+              badge.className = "absolute top-4 right-4 z-10 bg-red-500 text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm animate-bounce";
+              badge.textContent = "✗ 答錯！已記錄進錯題報告";
+              badge.classList.remove('hidden');
+            }
+
+            // 選項著色反饋
+            const allOptions = optDiv.querySelectorAll('.option-item');
+            allOptions.forEach(opt => {
+              const k = opt.dataset.key;
+              if (k === correctKey) {
+                opt.className = "option-item p-2 bg-green-100 border-green-500 rounded-lg border flex items-start gap-2 text-green-800 font-semibold transition-colors shadow-sm";
+              } else if (k === selectedKey && !isCorrect) {
+                opt.className = "option-item p-2 bg-red-100 border-red-500 rounded-lg border flex items-start gap-2 text-red-800 font-semibold transition-colors shadow-sm";
+              } else {
+                opt.className = "option-item p-2 bg-slate-50 border-slate-100 rounded-lg border flex items-start gap-2 text-slate-400 transition-colors opacity-60";
+              }
+            });
+
+            isFlipped = true;
+            document.getElementById('back').classList.remove('hidden');
+
+            const activePoolIds = cards.map(card => card.id);
+            const allAttemptedInPool = activePoolIds.every(id => attemptedCardIds.has(id));
+
+            if (allAttemptedInPool && isFirstAttemptForThisCard) {
+              setTimeout(() => {
+                showLevelUpBanner("🏆 第一輪測試完成！請點擊上方「📄 弱點報告」查看個人診斷。已為您解鎖【錯題重溫】模式！");
+                checkAndLevelUp();
+              }, 800);
+            } else if (isCorrect) {
+              checkAndLevelUp();
+            }
+
+            triggerMathJaxRender();
+          });
+
+          optDiv.appendChild(optItem);
+        });
+      } else {
+        optDiv.innerHTML = `<p class="text-xs italic text-slate-400">本題無選擇題選項</p>`;
+      }
+
+      const trashSpan = document.getElementById('trashList');
+      if (Array.isArray(c.trashOptions)) {
+        trashSpan.textContent = c.trashOptions.join(', ');
+      } else {
+        trashSpan.textContent = c.trashOptions || '無';
+      }
+
+      document.getElementById('killReason').textContent = c.killReason || '無秒殺理由';
+      document.getElementById('distractorText').textContent = c.distractorAnalysis || '無剖析';
+      document.getElementById('counter').textContent = `${currentIndex + 1} / ${cards.length}`;
+      updateProgressUI();
+
+      triggerMathJaxRender();
+    }
+
+    function showError(msg) {
+      const panel = document.getElementById('errorPanel');
+      document.getElementById('errorDetail').textContent = msg;
+      panel.classList.remove('hidden');
+    }
+
+    // 點擊空白處翻面
+    document.getElementById('card').addEventListener('click', (e) => {
+      if (
+        e.target.closest('#questionText') || 
+        e.target.closest('#imgContainer') || 
+        e.target.closest('#optionsList') ||
+        e.target.closest('#feedbackBadge')
+      ) {
+        return; 
+      }
+
+      isFlipped = !isFlipped;
+      const backDiv = document.getElementById('back');
+      if (isFlipped) {
+        backDiv.classList.remove('hidden');
+        triggerMathJaxRender();
+      } else {
+        backDiv.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', (e) => {
+      e.stopPropagation(); 
+      if (cards.length === 0) return;
+      let nextIdx = (currentIndex - 1 + cards.length) % cards.length;
+      currentIndex = findNextUnansweredIndex(nextIdx, -1);
+      renderCard();
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (cards.length === 0) return;
+      let nextIdx = (currentIndex + 1) % cards.length;
+      currentIndex = findNextUnansweredIndex(nextIdx, 1);
+      renderCard();
+    });
+
+    document.getElementById('randomBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (cards.length === 0) return;
+
+      const unattempted = cards.filter(card => !attemptedCardIds.has(card.id));
+      if (unattempted.length > 0) {
+        const targetCard = unattempted[Math.floor(Math.random() * unattempted.length)];
+        currentIndex = cards.findIndex(card => card.id === targetCard.id);
+        renderCard();
+        return;
+      }
+
+      const unmastered = cards.filter(card => !masteredCardIds.has(card.id));
+      if (unmastered.length === 0) {
+        currentIndex = Math.floor(Math.random() * cards.length);
+        renderCard();
+        return;
+      }
+
+      const available = unmastered.filter(card => (wrongCooldowns[card.id] || 0) <= 0);
+      const poolToUse = available.length > 0 ? available : unmastered;
+
+      const targetCard = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+      currentIndex = cards.findIndex(card => card.id === targetCard.id);
+      renderCard();
+    });
+
+    // 匯出診斷報告
+    function exportDiagnosticReport() {
+      if (originalCards.length === 0) {
+        alert("無題目數據，無法生成報告。");
+        return;
+      }
+
+      const selectedTopic = document.getElementById('topicFilter').value;
+      const selectedDiff = document.getElementById('difficultyFilter').value;
+      const selectedQType = document.getElementById('qtypeFilter').value;
+
+      let currentPool = [...originalCards];
+      if (selectedTopic !== 'ALL') {
+        currentPool = currentPool.filter(c => c.topic && c.topic.trim() === selectedTopic.trim());
+      }
+      if (selectedDiff !== 'ALL') {
+        currentPool = currentPool.filter(c => c.difficulty && c.difficulty.trim() === selectedDiff.trim());
+      }
+      if (selectedQType !== 'ALL') {
+        currentPool = currentPool.filter(c => c.qtype && c.qtype.trim() === selectedQType.trim());
+      }
+
+      const attemptedInPool = currentPool.filter(c => attemptedCardIds.has(c.id));
+      const totalAttempted = attemptedInPool.length;
+      const masteredCount = attemptedInPool.filter(c => masteredCardIds.has(c.id)).length;
+      const wrongCount = attemptedInPool.filter(c => wrongCardIds.has(c.id)).length;
+      const wrongList = attemptedInPool.filter(c => wrongCardIds.has(c.id));
+
+      let stageLabel = "";
+      if (selectedDiff !== 'ALL') {
+        stageLabel += selectedDiff === 'L' ? " [🟢 基礎 L] " : (selectedDiff === 'M' ? " [🟡 中等 M] " : " [🔴 衝五 H] ");
+      }
+      if (selectedQType !== 'ALL') {
+        stageLabel += selectedQType === 'C' ? " [💡 概念型] " : (selectedQType === 'M' ? " [📐 數學型] " : " [🧬 公式型] ");
+      }
+      if (selectedTopic !== 'ALL') {
+        stageLabel += ` [📚 ${selectedTopic}] `;
+      }
+      if (stageLabel === "") stageLabel = " [🌐 全部題目池] ";
+
+      let reportHtml = `
+      <!DOCTYPE html>
+      <html lang="zh-HK">
+      <head>
+        <meta charset="UTF-8">
+        <title>DSE Physics 個人學習弱點診斷報告</title>
+        <script src="https://cdn.tailwindcss.com"><\/script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"><\/script>
+        <style>
+          @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            .print-card { page-break-inside: avoid; border: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
+          }
+        </style>
+      </head>
+      <body class="bg-slate-50 p-6 min-h-screen text-slate-800">
+        <div class="max-w-4xl mx-auto bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+
+          <div class="flex justify-between items-center border-b border-slate-200 pb-6 mb-6">
+            <div>
+              <h1 class="text-3xl font-black text-slate-900 tracking-tight">⚡ DSE Physics 秒殺閃卡庫 ⚡</h1>
+              <p class="text-indigo-600 font-extrabold text-lg mt-1">
+                個人學習進度與弱點診斷報告 <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md font-bold ml-2">${stageLabel}</span>
+              </p>
+            </div>
+            <button onclick="window.print()" class="no-print bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5 text-sm">
+              🖨️ 列印此報告 / 另存為 PDF
+            </button>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-1.5">📊 階段測試數據 (Stage Statistics)</h2>
+          <div class="grid grid-cols-3 gap-4 mb-8">
+            <div class="bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-center shadow-sm">
+              <p class="text-xs font-bold text-indigo-700 uppercase tracking-wider">完成總數</p>
+              <p class="text-4xl font-black text-indigo-900 mt-1">${totalAttempted} <span class="text-sm font-semibold">題</span></p>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl text-center shadow-sm">
+              <p class="text-xs font-bold text-emerald-700 uppercase tracking-wider">答對總數</p>
+              <p class="text-4xl font-black text-emerald-900 mt-1">${masteredCount} <span class="text-sm font-semibold">題</span></p>
+            </div>
+            <div class="bg-rose-50 border border-rose-100 p-5 rounded-2xl text-center shadow-sm">
+              <p class="text-xs font-bold text-rose-700 uppercase tracking-wider">答錯總數</p>
+              <p class="text-4xl font-black text-rose-900 mt-1">${wrongCount} <span class="text-sm font-semibold">題</span></p>
+            </div>
+          </div>
+
+          <h2 class="text-xl font-bold text-rose-800 mb-4 pb-2 border-b border-rose-100 flex items-center gap-1.5">⚠️ 本階段待加強錯題詳情 (Wrong Questions List)</h2>
+
+          ${wrongList.length === 0 ? `
+            <div class="bg-green-50 border border-green-200 p-6 rounded-2xl text-center text-green-800 font-extrabold text-sm shadow-inner">
+              ✨ 太棒了！您在本測試階段中全數答對！沒有任何未解決的錯題，太優秀了！
+            </div>
+          ` : `
+            <div class="space-y-6">
+              ${wrongList.map((c, index) => {
+                let diffText = c.difficulty === 'L' ? '🟢 基礎 L' : (c.difficulty === 'M' ? '🟡 中等 M' : '🔴 衝五 H');
+                let qtypeText = c.qtype === 'C' ? '💡 概念分析' : (c.qtype === 'M' ? '📐 數學計算' : '🧬 公式/回憶');
+                return `
+                  <div class="print-card bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 text-xs text-slate-400">
+                      <span class="font-bold text-slate-700">錯題 #${index + 1} (ID: ${c.id})</span>
+                      <div class="flex gap-1.5">
+                        <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold">${c.topic}</span>
+                        <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${diffText}</span>
+                        <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold">${qtypeText}</span>
+                      </div>
+                    </div>
+                    <p class="text-slate-800 font-semibold mb-4 leading-relaxed">${c.question}</p>
+
+                    ${c.image && c.image.trim() !== "" ? `
+                    <div class="flex justify-center my-3">
+                      <img src="${c.image}" alt="題目圖示" class="max-h-56 object-contain rounded-xl border border-slate-200 shadow-sm" onerror="this.style.display='none'">
+                    </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-2 gap-4 text-xs mt-4">
+                      <div class="bg-red-50/70 border-l-4 border-red-500 p-3 rounded-r-xl">
+                        <h4 class="text-red-700 font-black">🗑️ 絕對垃圾選項：<span class="bg-red-200 text-red-800 px-1.5 py-0.2 rounded font-mono">${Array.isArray(c.trashOptions) ? c.trashOptions.join(', ') : c.trashOptions}</span></h4>
+                        <p class="text-red-800 mt-1 font-medium leading-relaxed">${c.killReason || '無'}</p>
+                      </div>
+                      <div class="bg-blue-50/70 border-l-4 border-blue-500 p-3 rounded-r-xl">
+                        <h4 class="text-blue-700 font-black">🎯 衝 5 考官設局剖析 (正解: ${c.answer})</h4>
+                        <p class="text-blue-900 mt-1 leading-relaxed">${c.distractorAnalysis || '無'}</p>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+
+          <div class="mt-12 text-center text-xs text-slate-400 border-t pt-4">
+            此報告由 DSE Physics 秒殺閃卡系統本地數據生成 • 請多加練習錯題直至掌握 • 預祝 DSE 物理勇奪佳績！
+          </div>
+
+        </div>
+      </body>
+      </html>
+      `;
+
+      const reportWindow = window.open("", "_blank");
+      if (reportWindow) {
+        reportWindow.document.write(reportHtml);
+        reportWindow.document.close();
+      } else {
+        alert("瀏覽器攔截了新分頁彈窗，請允許本網頁開啟彈窗以查看診斷報告！");
+      }
+    }
+
+    document.getElementById('exportReportBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportDiagnosticReport();
+    });
+
+    // 篩選器事件綁定
+    document.getElementById('topicFilter').addEventListener('change', applyFilters);
+    document.getElementById('difficultyFilter').addEventListener('change', applyFilters);
+    document.getElementById('qtypeFilter').addEventListener('change', applyFilters);
+    document.getElementById('modeFilter').addEventListener('change', applyFilters);
+
+    document.getElementById('resetProgressBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm("確定要重設本機所有的精通歷史、錯題與作答記錄嗎？（重設後所有題目都可以重新開始第一輪測試）")) {
+        masteredCardIds.clear();
+        wrongCardIds.clear();
+        attemptedCardIds.clear();
+        wrongCooldowns = {};
+        saveProgress();
+        document.getElementById('levelUpBanner').classList.add('hidden');
+        applyFilters();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      if (window.CARDS_LOAD_ERROR) {
+        showError(window.CARDS_LOAD_ERROR);
+      } else if (window.CARDS_DATA) {
+        initFlashcards(window.CARDS_DATA);
+      } else {
+        showError("未在 cards.js 偵測到 window.CARDS_DATA 變數。");
+      }
+    });
+  </script>
+</body>
+</html>
+```
